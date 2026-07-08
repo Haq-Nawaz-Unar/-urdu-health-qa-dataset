@@ -1,0 +1,219 @@
+"""
+scrape.py
+----------
+Ye script health-related Urdu websites ki links se text extract karke
+raw_data.json mein save karta hai.
+
+Kaise use karein:
+1. Neeche URLS list mein apni health website links dalein
+   (BBC Urdu Health, Jang Health, Hum Urdu Health, ya koi bhi Urdu health site)
+2. pip install requests beautifulsoup4 --break-system-packages
+3. python scrape.py
+4. Output: raw_data.json (har article ka title, url, aur text)
+"""
+
+import requests
+from bs4 import BeautifulSoup
+import json
+import time
+
+
+# -------------------------------------------------------------
+# STEP 1: Yahan apni health website URLs dalein
+# Tip: kisi bhi Urdu news/health site ke "Health" section mein jayein,
+# aur wahan se 20-30 article links copy karke yahan paste karein.
+# -------------------------------------------------------------
+URLS = [
+   "https://www.urdupoint.com/health/article/ghiza-kay-zariay-mukhtalif-bemarion-ka-elaaj/gaozaban-sehat-dost-pauda-3188.html",
+   
+  "https://www.express.pk/author/198/shabbir-ahmed-arman",
+  "https://www.express.pk/author/1984/meem-sheen-khay",
+  "https://www.express.pk/code-of-ethics",
+  "https://www.express.pk/health/archives",
+  "https://www.express.pk/story/2819131/trading-cigarettes-for-vapes-may-still-be-harmful-for-vision-2819131",
+  "https://www.express.pk/story/2819156/pakistans-first-mobile-wildlife-clinic-for-treatment-and-rescue-of-wild-animals-2819156",
+  "https://www.express.pk/story/2819306/bones-cracking-fatigue-and-constant-headaches-are-you-suffering-from-this-silent-epidemic-2819306",
+  "https://www.express.pk/story/2819367/glp-1-drug-2819367",
+  "https://www.express.pk/story/2819379/horrifying-plague-of-zombie-squirrels-2819379",
+  "https://www.express.pk/story/2819460/government-takes-major-decision-to-eliminate-fake-and-substandard-medicines-from-the-country-2819460",
+  "https://www.express.pk/story/2819498/weight-loss-jab-users-2819498",
+  "https://www.express.pk/story/2819511/taking-an-omega-3-supplement-doesnt-boost-memory-2819511",
+  "https://www.express.pk/story/2819576/polio-vaccine-in-sindh-and-pakistan-2819576",
+  "https://www.express.pk/story/2819641/people-under-50-2819641",
+  "https://www.express.pk/story/2819837/dopamine-loss-linked-to-2819837",
+  "https://www.express.pk/story/2819982/spend-time-in-sunlight-2819982",
+  "https://www.express.pk/story/2820161/covid-booster-jabs-could-protect-2820161",
+  "https://www.urdupoint.com/business/prize-bonds-draw-schedule.html",
+  "https://www.urdupoint.com/dictionary/translate-english-to-urdu.html",
+  "https://www.urdupoint.com/education/academies-in-pakistan.html",
+  "https://www.urdupoint.com/education/boards-of-education.html",
+  "https://www.urdupoint.com/health/article/backache/kamar-dard-2971.html",
+  "https://www.urdupoint.com/health/article/backache/kamar-dard-ke-bare-mein-kab-pareshan-hona-chahiye-aur-kab-nahi-2850.html",
+  "https://www.urdupoint.com/health/article/backache/kamar-dard-ki-wajohat-aur-ilaj-2932.html",
+  "https://www.urdupoint.com/health/article/backache/kamar-dard-se-nijat-ke-liye-mutaharrik-raheen-2969.html",
+  "https://www.urdupoint.com/health/article/backache/kamar-mein-dard-ki-lehrain-2646.html",
+  "https://www.urdupoint.com/health/article/backache/peeth-ka-dard-aur-muasar-warzishain-2528.html",
+  "https://www.urdupoint.com/health/article/blood-pressure/buland-fishar-e-khoon-2810.html",
+  "https://www.urdupoint.com/health/article/blood-pressure/buland-fishar-e-khoon-kam-karne-ke-chand-iqdam-2998.html",
+  "https://www.urdupoint.com/health/article/blood-pressure/buland-fishar-e-khoon-ke-liye-na-mawafiq-ghizain-2848.html",
+  "https://www.urdupoint.com/health/article/blood-pressure/ghiza-aur-sehat-ke-masail-3134.html",
+  "https://www.urdupoint.com/health/article/blood-pressure/high-blood-pressure-aik-khamosh-qatil-3098.html",
+  "https://www.urdupoint.com/health/article/blood-pressure/pregnancy-blood-pressure-and-complications-2881.html",
+  "https://www.urdupoint.com/health/article/breakfast/ande-mein-kuch-khaas-hai-3038.html",
+  "https://www.urdupoint.com/health/article/breakfast/behtar-nashta-behtareen-sehat-2772.html",
+  "https://www.urdupoint.com/health/article/breakfast/ik-nai-subah-ik-naya-aaghaz-2979.html",
+  "https://www.urdupoint.com/health/article/breakfast/nashta-behtar-sehat-ke-liye-lazim-2627.html",
+  "https://www.urdupoint.com/health/article/breakfast/shehad-se-nashta-sehat-se-aarasta-3176.html",
+  "https://www.urdupoint.com/health/article/breakfast/subah-ka-nashta-kaisa-ho-2824.html",
+  "https://www.urdupoint.com/health/article/cough-and-throat-infection/khansi-bache-aur-naye-taqaze-3179.html",
+  "https://www.urdupoint.com/health/article/cough-and-throat-infection/shehad-aur-daar-cheeni-ke-istemal-se-motapa-aur-gale-ki-kharabi-dor-2912.html",
+  "https://www.urdupoint.com/health/article/dengue/dengue-aik-khatarnak-marz-2795.html",
+  "https://www.urdupoint.com/health/article/dengue/dengue-bukhar-ehtiyat-zaroori-hai-2773.html",
+  "https://www.urdupoint.com/health/article/dengue/dengue-bukhar-hua-beqaaboo-3007.html",
+  "https://www.urdupoint.com/health/article/dengue/dengue-bukhar-mein-kya-khayen-aur-kin-cheezon-se-parhez-karen-2990.html",
+  "https://www.urdupoint.com/health/article/dengue/malaria-barwaqt-durust-aur-mukamal-ilaj-naguzeer-2957.html",
+  "https://www.urdupoint.com/health/article/dengue/zard-bukhar-2996.html",
+  "https://www.urdupoint.com/health/article/depression/zehni-tanao-se-bimariyan-lahaq-3182.html",
+  "https://www.urdupoint.com/health/article/exercise/aaiye-yogiyun-ki-baithak-mein-3107.html",
+  "https://www.urdupoint.com/health/article/exercise/aerobics-warzish-ke-fawaid-2999.html",
+  "https://www.urdupoint.com/health/article/exercise/garmiyon-mein-apni-sehat-ka-khas-khayal-rakhain-3008.html",
+  "https://www.urdupoint.com/health/article/exercise/gym-chorain-jogging-karen-3036.html",
+  "https://www.urdupoint.com/health/article/exercise/hiss-e-mizah-sehat-ki-kunji-2942.html",
+  "https://www.urdupoint.com/health/article/exercise/yoga-warzish-nahi-falsafa-bhi-hai-3158.html",
+  "https://www.urdupoint.com/health/article/eyes/aankhon-ko-infection-se-bachaain-2887.html",
+  "https://www.urdupoint.com/health/article/eyes/ankhain-hazar-naimat-yeh-roshan-to-duniya-roshan-2861.html",
+  "https://www.urdupoint.com/health/article/eyes/ashob-e-chashm-mahdood-noviyat-ki-bimari-hai-3138.html",
+  "https://www.urdupoint.com/health/article/eyes/bachon-mein-bhenga-pan-3155.html",
+  "https://www.urdupoint.com/health/article/eyes/bhenge-pan-ki-iqsam-aur-wajohat-2820.html",
+  "https://www.urdupoint.com/health/article/eyes/eyesight-taiz-karne-wali-ghazain-2890.html",
+  "https://www.urdupoint.com/health/article/face-and-skin/bars-la-ilaaj-nahi-2532.html",
+  "https://www.urdupoint.com/health/article/face-and-skin/jildi-amraz-se-bachao-ke-liye-ehem-tadabeer-aur-nuskhay-2239.html",
+  "https://www.urdupoint.com/health/article/face-and-skin/keel-o-muhase-2868.html",
+  "https://www.urdupoint.com/health/article/face-and-skin/leishmania-aik-khatarnak-jildi-marz-2779.html",
+  "https://www.urdupoint.com/health/article/face-and-skin/psoriasis-2920.html",
+  "https://www.urdupoint.com/health/article/face-and-skin/zinc-ki-kami-2784.html",
+  "https://www.urdupoint.com/health/article/ghiza-kay-zariay-mukhtalif-bemarion-ka-elaaj/doodh-mufeed-ya-muzir-3181.html",
+  "https://www.urdupoint.com/health/article/ghiza-kay-zariay-mukhtalif-bemarion-ka-elaaj/gaozaban-sehat-dost-pauda-3188.html",
+  "https://www.urdupoint.com/health/article/ghiza-kay-zariay-mukhtalif-bemarion-ka-elaaj/kheera-aap-ko-bimar-bhi-kar-sakta-hai-3187.html",
+  "https://www.urdupoint.com/health/article/ghiza-kay-zariay-mukhtalif-bemarion-ka-elaaj/machli-maqvi-tareen-ghiza-3180.html",
+  "https://www.urdupoint.com/health/article/ghiza-kay-zariay-mukhtalif-bemarion-ka-elaaj/sehat-bakhsh-sohanjna-moringa-3177.html",
+  "https://www.urdupoint.com/health/article/healthart/aap-dama-asthma-control-kar-sakte-hain-3178.html",
+  "https://www.urdupoint.com/health/article/healthart/mausam-e-garma-mein-ehtiyati-tadabeer-3183.html",
+  "https://www.urdupoint.com/health/article/healthart/pindliyon-ki-ragon-ka-phoolna-3184.html",
+  "https://www.urdupoint.com/health/article/healthart/sozish-e-jigar-ka-ilaj-3186.html",
+  "https://www.urdupoint.com/health/article/joint-pain/arthritis-ke-marz-mein-aspirin-ka-istemal-2836.html",
+  "https://www.urdupoint.com/health/article/joint-pain/fibromyalgia-pathon-aur-joron-ki-bimari-2698.html",
+  "https://www.urdupoint.com/health/article/joint-pain/ghutnon-aur-joron-ka-dard-2858.html",
+  "https://www.urdupoint.com/health/article/joint-pain/hadiyan-tawana-zindagi-shahana-2774.html",
+  "https://www.urdupoint.com/health/article/joint-pain/mutawazan-wazan-ko-qaim-rakhiye-3167.html",
+  "https://www.urdupoint.com/health/article/joint-pain/rait-ke-ghusal-se-dard-ka-ilaj-2918.html",
+  "https://www.urdupoint.com/health/article/paralysis/cigarette-peene-walon-ko-falij-ka-khadsha-3185.html",
+  "https://www.urdupoint.com/health/article/sugar/chaar-mashroobat-jo-blood-sugar-ko-control-mein-rakhte-hain-2936.html",
+  "https://www.urdupoint.com/health/article/sugar/diabetes-aur-munh-ki-sehat-3125.html",
+  "https://www.urdupoint.com/health/article/sugar/diabetes-type-5-2987.html",
+  "https://www.urdupoint.com/health/article/sugar/hajj-umrah-aur-ziabetus-3073.html",
+  "https://www.urdupoint.com/health/article/sugar/mah-e-siyam-aur-diabetes-ke-mareez-2945.html",
+  "https://www.urdupoint.com/health/article/sugar/mah-e-siyam-diabetes-aur-aap-3108.html",
+  "https://www.urdupoint.com/health/article/weight-loss/chocolate-bhi-khaye-wazan-bhi-na-barhain-2764.html",
+  "https://www.urdupoint.com/health/article/weight-loss/motapa-wabaal-e-jaan-3092.html",
+  "https://www.urdupoint.com/health/article/weight-loss/motape-ka-ilaj-husn-e-tadbeer-se-2878.html",
+  "https://www.urdupoint.com/health/article/weight-loss/qudrati-andaaz-mein-wazan-kam-karen-2843.html",
+  "https://www.urdupoint.com/health/article/weight-loss/so-jaiye-wazan-kam-ho-ga-2728.html",
+  "https://www.urdupoint.com/health/articles.html",
+  "https://www.urdupoint.com/health/category/backache.html",
+  "https://www.urdupoint.com/health/category/banjh-pan.html",
+  "https://www.urdupoint.com/health/category/beautification.html",
+  "https://www.urdupoint.com/health/category/blood-pressure.html",
+  "https://www.urdupoint.com/health/category/breakfast.html",
+  "https://www.urdupoint.com/health/category/cancer.html",
+  "https://www.urdupoint.com/health/category/cholesterol.html",
+  "https://www.urdupoint.com/health/category/cough-and-throat-infection.html",
+  "https://www.urdupoint.com/health/category/dengue.html",
+  "https://www.urdupoint.com/health/category/depression.html",
+  "https://www.urdupoint.com/health/category/dieting.html",
+  "https://www.urdupoint.com/health/category/exercise.html",
+  "https://www.urdupoint.com/health/category/eyes.html",
+  "https://www.urdupoint.com/health/category/face-and-skin.html",
+  "https://www.urdupoint.com/health/category/ghiza-aur-sehat.html",
+  "https://www.urdupoint.com/health/category/ghiza-kay-zariay-mukhtalif-bemarion-ka-elaaj.html",
+  "https://www.urdupoint.com/health/category/healthart.html",
+  "https://www.urdupoint.com/health/category/joint-pain.html",
+  "https://www.urdupoint.com/health/category/liver.html",
+  "https://www.urdupoint.com/health/category/nose-and-ear.html",
+  "https://www.urdupoint.com/health/category/paralysis.html",
+  "https://www.urdupoint.com/health/category/piles.html",
+  "https://www.urdupoint.com/health/category/sugar.html",
+  "https://www.urdupoint.com/health/category/teeth.html",
+  "https://www.urdupoint.com/health/category/weight-loss.html",
+  "https://www.urdupoint.com/health/guide/bone-disease.html",
+  "https://www.urdupoint.com/health/news.html",
+  "https://www.urdupoint.com/horoscope/daily-horoscope-in-urdu.html",
+  "https://www.urdupoint.com/islam/pakistan-ramadan-calendar-sehar-aftar-timings.html",
+  "https://www.urdupoint.com/islam/ramadan-calendar-sehar-aftar-timings-up.html",
+  "https://www.urdupoint.com/islam/today-islamic-date.html",
+  "https://www.urdupoint.com/sports/cricket-league/14/pakistan-super-league-2025.html",
+  "https://www.urdupoint.com/videos/best-rehab-centre-in-islamabad-new-soch-rehab-and-psychiatric-center-islamabad-ihra-registered.html",
+  "https://www.urdupoint.com/videos/geo-pak-hospital-lahore-har-pakistani-ka-free-operation-aur-ilaaj-hum-dawa-dete-aur-dua-lete-hai.html",
+  "https://www.urdupoint.com/videos/health.html",
+  "https://www.urdupoint.com/videos/monkeypox-alert-in-lahore-1st-monkeypox-patient-condition-revealed-prevention-measures-explained.html",
+  "https://www.urdupoint.com/videos/nipah-virus-after-coronavirus-nipah-virus-alert-in-pakistan-after-spread-in-india.html",
+  "https://www.urdupoint.com/videos/punjab-governments-order-to-close-private-pharmacies-in-all-government-hospitals.html",
+  "https://www.urdupoint.com/videos/swallow-a-capsule-get-a-full-ai-diagnosis-chinese-ai-powered-endoscopy-tech-arrives-in-pakistan.html"
+
+]
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+}
+
+
+
+
+def extract_article_text(url: str) -> dict | None:
+    """Ek URL se title aur paragraph text nikalta hai."""
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=15)
+        response.raise_for_status()
+    except requests.RequestException as e:
+        print(f"[SKIP] {url} -> {e}")
+        return None
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Title nikalna (h1 sabse common hota hai)
+    title_tag = soup.find("h1")
+    title = title_tag.get_text(strip=True) if title_tag else ""
+
+    # Sab <p> tags se text jama karna
+    paragraphs = soup.find_all("p")
+    text = " ".join(p.get_text(strip=True) for p in paragraphs)
+
+    # Bohot chhota text (menu/footer junk) skip karna
+    if len(text) < 200:
+        print(f"[SKIP - too short] {url}")
+        return None
+
+    return {"url": url, "title": title, "text": text}
+
+
+def main():
+    if not URLS:
+        print("URLS list khali hai! Pehle URLS list mein links dalein.")
+        return
+
+    results = []
+    for url in URLS:
+        print(f"Fetching: {url}")
+        data = extract_article_text(url)
+        if data:
+            results.append(data)
+        time.sleep(1)  # Server pe zyada load na dalein
+
+    with open("raw_data.json", "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+
+    print(f"\nDone! {len(results)} articles saved to raw_data.json")
+
+
+if __name__ == "__main__":
+    main()
